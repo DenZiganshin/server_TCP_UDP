@@ -104,7 +104,6 @@ private:
     int sock_tcp, sock_udp;
     std::string ip;
     int port;
-    std::vector<int> tcp_clients;
     std::mutex mtx_stop;
     bool is_stop;
     std::thread *thr_serv_loop;

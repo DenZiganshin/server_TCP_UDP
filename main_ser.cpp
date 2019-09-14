@@ -10,7 +10,7 @@ using namespace std;
 
 void usage(){
     cout << "usage:" << endl;
-    cout << "i - ip" << endl << "p - port" << "h - this help" << endl;
+    cout << "i - ip" << endl << "p - port" << endl << "h - this help" << endl;
 }
 
 int main(int argc, char **argv)

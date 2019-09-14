@@ -264,6 +264,7 @@ bool Server::process_tcp_client(std::vector <struct pollfd> &fds, int num){
     }else{
         // удаляем сокет из списка наблюдаемых
         std::cout << "client disconnected or smth" << std::endl;
+        close(fds.at(num).fd);
         fds.erase(fds.begin()+num);
     }
 
