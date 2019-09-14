@@ -324,9 +324,11 @@ void Server::server_loop()
 
     while( true ){
         if(this->mtx_stop.try_lock()){
+            bool value = this->is_stop;
             this->mtx_stop.unlock();
-            if(this->is_stop)
+            if(value){
                 break;
+            }
         }
 
         int ret = poll( fds.data(), fds.size(), poll_timeout);
