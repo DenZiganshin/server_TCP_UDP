@@ -220,42 +220,30 @@ bool Server::process_new_tcp_connection(std::vector <struct pollfd> *fds){
 
 bool Server::process_udp(){
     int actual_read = -1;
-    struct sockaddr_in serv_addr;
     char buffer[this->max_msg_size] = {0};
+    sockaddr_in from;
 
-    socklen_t len = sizeof(serv_addr);
-    actual_read  = recvfrom(this->sock_udp, buffer, this->max_msg_size, MSG_WAITALL, (struct sockaddr*) &serv_addr, &len);
+    actual_read  = recv_udp((uint8_t*) buffer, this->max_msg_size, &from);
     if( actual_read <= 0){
         std::cout << "udp: nothing to read" << std::endl;
     }else{
-        std::cout << "udp: we got "<<actual_read<<" bytes : "<<buffer << " from:" << inet_ntoa(serv_addr.sin_addr) << std::endl;
+        std::cout << "udp: we got "<<actual_read<<" bytes : "<<buffer << std::endl;
         int actual_send = -1;
         std::string resp_str1, resp_str2;
         response(std::string(buffer), &resp_str1, &resp_str2);
 
         //part 1
-        uint32_t size = resp_str1.length();
-        uint32_t net_size = htonl(size);
-        actual_send = sendto(this->sock_udp, &net_size, sizeof(uint32_t), MSG_CONFIRM, (struct sockaddr*) &serv_addr, sizeof(serv_addr));
-        if( actual_send == -1){
-            std::cout << "udp: unable to send size: "<< size << std::endl;
-        }
-        actual_send = sendto(this->sock_udp, resp_str1.c_str(), resp_str1.length(), MSG_CONFIRM, (struct sockaddr*) &serv_addr, sizeof(serv_addr));
-        if( actual_send == -1){
-            std::cout << "udp: unable to send: " << resp_str1 << std::endl;
+        actual_send = send_udp(&from,(uint8_t*) resp_str1.c_str(), (uint32_t)resp_str1.length());
+        if(actual_send == -1){
+            std::cout << "unable to send response1" << std::endl;
         }
 
         //part 2
-        size = resp_str2.length();
-        net_size = htonl(size);
-        actual_send = sendto(this->sock_udp, &net_size, sizeof(uint32_t), MSG_CONFIRM, (struct sockaddr*) &serv_addr, sizeof(serv_addr));
-        if( actual_send == -1){
-            std::cout << "udp: unable to send size: "<< size << std::endl;
+        actual_send = send_udp(&from,(uint8_t*) resp_str2.c_str(), (uint32_t)resp_str2.length());
+        if(actual_send == -1){
+            std::cout << "unable to send response2" << std::endl;
         }
-        actual_send = sendto(this->sock_udp, resp_str2.c_str(), resp_str2.length(), MSG_CONFIRM, (struct sockaddr*) &serv_addr, sizeof(serv_addr));
-        if( actual_send == -1){
-            std::cout << "udp: unable to send: " << resp_str2 << std::endl;
-        }
+
     }
     return true;
 }
@@ -266,7 +254,8 @@ bool Server::process_tcp_client(std::vector <struct pollfd> *fds, int num){
     }
     char buffer[this->max_msg_size] = {0};
     int actual_read = -1;
-    actual_read = read( fds->at(num).fd , buffer, this->max_msg_size);
+
+    actual_read = recv_tcp(fds->at(num).fd,(uint8_t*) buffer, this->max_msg_size);
     if ( actual_read > 0){
         std::cout << "tcp: we got " << actual_read << " bytes: " << buffer << std::endl;
         int actual_send = -1;
@@ -274,27 +263,15 @@ bool Server::process_tcp_client(std::vector <struct pollfd> *fds, int num){
         response(std::string(buffer), &resp_str1, &resp_str2);
 
         //part 1
-        uint32_t size = resp_str1.length();
-        uint32_t net_size = htonl(size);
-        actual_send = send(fds->at(num).fd, &net_size, sizeof(uint32_t), 0);
-        if( actual_send == -1){
-            std::cout << "tcp: unable to send size: " << size << std::endl;
-        }
-        actual_send = send(fds->at(num).fd, resp_str1.c_str(), size, 0);
-        if( actual_send == -1){
-            std::cout << "tcp: unable to send: " << resp_str1 << std::endl;
+        actual_send = send_tcp(fds->at(num).fd,(uint8_t*) resp_str1.c_str(), (uint32_t)resp_str1.length());
+        if(actual_send == -1){
+            std::cout << "unable to send response1" << std::endl;
         }
 
         //part 2
-        size = resp_str2.length();
-        net_size = htonl(size);
-        actual_send = send(fds->at(num).fd, &net_size, sizeof(uint32_t), 0);
-        if( actual_send == -1){
-            std::cout << "tcp: unable to send size: " << size << std::endl;
-        }
-        actual_send = send(fds->at(num).fd, resp_str2.c_str(), size, 0);
-        if( actual_send == -1){
-            std::cout << "tcp: unable to send: " << resp_str2 << std::endl;
+        actual_send = send_tcp(fds->at(num).fd,(uint8_t*) resp_str2.c_str(), (uint32_t)resp_str2.length());
+        if(actual_send == -1){
+            std::cout << "unable to send response2" << std::endl;
         }
     }else{
         // удаляем сокет из списка наблюдаемых
@@ -408,4 +385,97 @@ void Server::response(const std::string &input, std::string *outstr1, std::strin
             *outstr1 += " ";
     }
     outstr2->append(std::to_string(sum));
+}
+
+int Server::send_tcp(int fd, const uint8_t *data, uint32_t size)
+{
+    if(!data || (size > this->max_msg_size))
+        return -1;
+
+    uint32_t net_size = htonl(size);
+    int actual_send = -1;
+    actual_send = send(fd, &net_size, sizeof(uint32_t), 0);
+    if( actual_send < (int)sizeof(uint32_t)){
+        std::cout << "tcp: unable to send size" << std::endl;
+        return -1;
+    }
+    actual_send = send(fd, data, size, 0);
+    if( actual_send < (int)size){
+        std::cout << "tcp: unable to send data" << std::endl;
+        return -1;
+    }
+
+    return (int)size;
+}
+
+int Server::send_udp(struct sockaddr_in* dst, const uint8_t *data, uint32_t size)
+{
+    if(!data || !dst || (size > this->max_msg_size))
+        return -1;
+
+    uint32_t net_size = htonl(size);
+    int actual_send = -1;
+    actual_send = sendto(this->sock_udp, &net_size, sizeof(uint32_t), MSG_CONFIRM, (struct sockaddr*) dst, sizeof(struct sockaddr));
+    if( actual_send < (int)sizeof(uint32_t)){
+        std::cout << "udp: unable to send size" << std::endl;
+        return -1;
+    }
+    actual_send = sendto(this->sock_udp, data, size, MSG_CONFIRM, (struct sockaddr*) (struct sockaddr*) dst, sizeof(struct sockaddr));
+    if( actual_send < (int)size){
+        std::cout << "udp: unable to send data" << std::endl;
+        return -1;
+    }
+
+    return (int)size;
+}
+
+int Server::recv_tcp(int fd, uint8_t* buffer, uint32_t max_size)
+{
+    if(!buffer){
+        return -1;
+    }
+
+    int actual_read = -1;
+    uint32_t net_size = -1, size = -1;
+
+    actual_read = read( fd, &net_size, sizeof(uint32_t));
+    if(actual_read<(int)sizeof(uint32_t)){
+        return -1;
+    }
+    size = ntohl(net_size);
+    if(size > max_size){
+        return -1;
+    }
+    actual_read = read( fd, buffer, size);
+    if(actual_read<(int)size){
+        return -1;
+    }
+    return (int)size;
+}
+
+int Server::recv_udp(uint8_t* buffer, uint32_t max_size, struct sockaddr_in *from)
+{
+    if(!buffer || !from){
+        return -1;
+    }
+
+    int actual_read = -1;
+    uint32_t net_size = -1, size = -1;
+    socklen_t len = sizeof(*from);
+
+    actual_read  = recvfrom(this->sock_udp, &net_size, sizeof(uint32_t), MSG_WAITALL, (struct sockaddr *) from, &len);
+    if(actual_read<(int)sizeof(uint32_t)){
+        return -1;
+    }
+    size = ntohl(net_size);
+    if(size > max_size){
+        return -1;
+    }
+
+    actual_read  = recvfrom(this->sock_udp, buffer, size, MSG_WAITALL, (struct sockaddr *) from, &len);
+    if(actual_read<(int)size){
+        return -1;
+    }
+
+    return (int)size;
 }

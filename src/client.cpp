@@ -1,6 +1,7 @@
 #include "client.h"
 
 #include <string>
+#include <iostream>
 
 #include <unistd.h>
 #include <sys/socket.h>
@@ -45,7 +46,7 @@ bool Client::init(std::string ip, int port, bool is_tcp)
     return true;
 }
 
-int Client::send_data(const char* data, int size)
+int Client::send_data(const uint8_t* data, uint32_t size)
 {
     if(!data){
         throw "no data";
@@ -53,8 +54,10 @@ int Client::send_data(const char* data, int size)
     }
     int actual_send = -1;
 
+    uint32_t net_size = htonl(size);
     if( this->is_tcp ){
-        actual_send = send(this->sock , data , size , 0 );
+        actual_send = send(this->sock , &net_size, sizeof(uint32_t), 0 );
+        actual_send = send(this->sock , data, size, 0 );
     }else{
         struct sockaddr_in serv_addr;
         // Filling server information
@@ -64,26 +67,61 @@ int Client::send_data(const char* data, int size)
         {
             return -1;
         }
+        actual_send = sendto(this->sock, &net_size, sizeof(uint32_t), MSG_CONFIRM, (const struct sockaddr *) &serv_addr, sizeof(serv_addr));
+        if(actual_send < (int)sizeof(uint32_t)){
+            return -1;
+            std::cout << "unable to send size" << std::endl;
+        }
         actual_send = sendto(this->sock, data, size, MSG_CONFIRM, (const struct sockaddr *) &serv_addr, sizeof(serv_addr));
+        if(actual_send < (int)size){
+            return -1;
+            std::cout << "unable to send data" << std::endl;
+        }
     }
-    return actual_send;
+    return (int)size;
 }
 
-int Client::recv_data(char* buffer, int max_size)
+int Client::recv_data(uint8_t* buffer, uint32_t max_size)
 {
     if(!buffer){
         return -1;
     }
+
     int actual_read = -1;
+    uint32_t net_size = -1, size = -1;
+
     if( this->is_tcp ){
-        actual_read = read( this->sock , buffer, max_size);
+        actual_read = read( this->sock , &net_size, sizeof(uint32_t));
+        if(actual_read<(int)sizeof(uint32_t)){
+            return -1;
+        }
+        size = ntohl(net_size);
+        if(size > max_size){
+            return -1;
+        }
+        actual_read = read( this->sock , buffer, size);
+        if(actual_read<(int)size){
+            return -1;
+        }
     }else{
         struct sockaddr_in serv_addr;
         //memsets
         socklen_t len = sizeof(serv_addr);
-        actual_read  = recvfrom(this->sock, buffer, max_size, MSG_WAITALL, (struct sockaddr *) &serv_addr, &len);
+        actual_read  = recvfrom(this->sock, &net_size, sizeof(uint32_t), MSG_WAITALL, (struct sockaddr *) &serv_addr, &len);
+        if(actual_read<(int)sizeof(uint32_t)){
+            return -1;
+        }
+        size = ntohl(net_size);
+        if(size > max_size){
+            return -1;
+        }
+
+        actual_read  = recvfrom(this->sock, buffer, size, MSG_WAITALL, (struct sockaddr *) &serv_addr, &len);
+        if(actual_read<(int)size){
+            return -1;
+        }
     }
-    return actual_read;
+    return (int)size;
 }
 
 void Client::disconnect()

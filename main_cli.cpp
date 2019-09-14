@@ -78,24 +78,18 @@ int main(int argc, char **argv)
     cout << "{" << message << "}" << endl;
 
     client->init(ip, port, is_tcp);
-    client->send_data(message.c_str(), message.length());
+    client->send_data((uint8_t*) message.c_str(), message.length());
     char buffer[max_msg_size] = {0};
 
     //part 1
-    uint32_t net_size = 0;
-    uint32_t size = 0;
-    client->recv_data((char*)&net_size, sizeof(uint32_t) );
-    size = ntohl(net_size);
-    client->recv_data(buffer, size);
-    cout << buffer<<" ";
+    int actual_size = client->recv_data((uint8_t*) buffer, max_msg_size);
+    cout << string(buffer, actual_size) <<" ";
 
     std::memset(buffer, 0, sizeof(buffer));
 
     //part 2
-    client->recv_data((char*)&net_size, sizeof(uint32_t) );
-    size = ntohl(net_size);
-    client->recv_data(buffer, size);
-    cout <<buffer<<endl;
+    actual_size = client->recv_data((uint8_t*) buffer, max_msg_size);
+    cout <<string(buffer, actual_size)<<endl;
 
     client->disconnect();
 

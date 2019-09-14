@@ -94,6 +94,12 @@ private:
      * @param outstr2 - ответ2
      */
     void response(const std::string &input, std::string *outstr1, std::string *outstr2);
+
+    int send_tcp(int fd, const uint8_t *data, uint32_t size);
+    int send_udp(struct sockaddr_in* dst, const uint8_t *data, uint32_t size);
+
+    int recv_tcp(int fd, uint8_t* buffer, uint32_t max_size);
+    int recv_udp(uint8_t* buffer, uint32_t max_size, struct sockaddr_in *from);
 private:
     int sock_tcp, sock_udp;
     std::string ip;

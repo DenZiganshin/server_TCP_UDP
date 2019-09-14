@@ -26,7 +26,7 @@ public:
      * @param size - количество байт
      * @return количество отправленных байт или -1
      */
-    int send_data(const char* data, int size);
+    int send_data(const uint8_t* data, uint32_t size);
 
     /**
      * @brief получение данных
@@ -34,7 +34,7 @@ public:
      * @param max_size - максимальный размер
      * @return количество прочитанных байт или -1
      */
-    int recv_data(char* buffer, int max_size);
+    int recv_data(uint8_t* buffer, uint32_t max_size);
 
     /**
      * @brief закрытие сокетов
