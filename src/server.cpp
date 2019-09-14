@@ -180,24 +180,15 @@ void Server::close_sock(int &s)
  * @param fds - список наблюдения
  * @param sock - сокет
  */
-inline void add_to_pool(std::vector <struct pollfd> *fds, int sock){
-    if(!fds){
-        throw "add_to_pool: input arguments";
-        return;
-    }
-
+inline void add_to_pool(std::vector <struct pollfd> &fds, int sock){
     struct pollfd poll_fd;
     poll_fd.fd = sock;
     poll_fd.events = POLLIN;
-    fds->push_back(poll_fd);
+    fds.push_back(poll_fd);
 }
 
 
-bool Server::process_new_tcp_connection(std::vector <struct pollfd> *fds){
-    if(!fds){
-        return false;
-    }
-
+bool Server::process_new_tcp_connection(std::vector <struct pollfd> &fds){
     struct sockaddr address;
     socklen_t addrlen = sizeof(address);
     int new_socket = -1;
@@ -230,7 +221,7 @@ bool Server::process_udp(){
         std::cout << "udp: we got "<<actual_read<<" bytes : "<<buffer << std::endl;
         int actual_send = -1;
         std::string resp_str1, resp_str2;
-        response(std::string(buffer), &resp_str1, &resp_str2);
+        response(std::string(buffer), resp_str1, resp_str2);
 
         //part 1
         actual_send = send_udp(&from,(uint8_t*) resp_str1.c_str(), (uint32_t)resp_str1.length());
@@ -248,35 +239,32 @@ bool Server::process_udp(){
     return true;
 }
 
-bool Server::process_tcp_client(std::vector <struct pollfd> *fds, int num){
-    if(!fds){
-        return false;
-    }
+bool Server::process_tcp_client(std::vector <struct pollfd> &fds, int num){
     char buffer[this->max_msg_size] = {0};
     int actual_read = -1;
 
-    actual_read = recv_tcp(fds->at(num).fd,(uint8_t*) buffer, this->max_msg_size);
+    actual_read = recv_tcp(fds.at(num).fd,(uint8_t*) buffer, this->max_msg_size);
     if ( actual_read > 0){
         std::cout << "tcp: we got " << actual_read << " bytes: " << buffer << std::endl;
         int actual_send = -1;
         std::string resp_str1, resp_str2;
-        response(std::string(buffer), &resp_str1, &resp_str2);
+        response(std::string(buffer), resp_str1, resp_str2);
 
         //part 1
-        actual_send = send_tcp(fds->at(num).fd,(uint8_t*) resp_str1.c_str(), (uint32_t)resp_str1.length());
+        actual_send = send_tcp(fds.at(num).fd,(uint8_t*) resp_str1.c_str(), (uint32_t)resp_str1.length());
         if(actual_send == -1){
             std::cout << "unable to send response1" << std::endl;
         }
 
         //part 2
-        actual_send = send_tcp(fds->at(num).fd,(uint8_t*) resp_str2.c_str(), (uint32_t)resp_str2.length());
+        actual_send = send_tcp(fds.at(num).fd,(uint8_t*) resp_str2.c_str(), (uint32_t)resp_str2.length());
         if(actual_send == -1){
             std::cout << "unable to send response2" << std::endl;
         }
     }else{
         // удаляем сокет из списка наблюдаемых
         std::cout << "client disconnected or smth" << std::endl;
-        fds->erase(fds->begin()+num);
+        fds.erase(fds.begin()+num);
     }
 
     return true;
@@ -321,7 +309,7 @@ void Server::server_loop()
                 if( fds[i].revents & POLLIN ){
                     fds[i].revents = 0;
                     if( fds[i].fd == this->sock_tcp ){
-                        if(!process_new_tcp_connection(&fds)){
+                        if(!process_new_tcp_connection(fds)){
                             std::cout << "unable to process new tcp connection" << std::endl;
                             return;
                         }
@@ -331,7 +319,7 @@ void Server::server_loop()
                             return;
                         }
                     }else{
-                        if(!process_tcp_client(&fds, i)){
+                        if(!process_tcp_client(fds, i)){
                             std::cout << "unable to process tcp clients" << std::endl;
                             return;
                         }
@@ -350,12 +338,8 @@ void Server::server_task()
     std::this_thread::sleep_for(std::chrono::seconds(5));
 }
 
-void Server::response(const std::string &input, std::string *outstr1, std::string *outstr2)
+void Server::response(const std::string &input, std::string &outstr1, std::string &outstr2)
 {
-    if(!outstr1 || !outstr2){
-        return;
-    }
-
     //parse
     std::stringstream inp_stream(input);
     std::string item;
@@ -380,11 +364,11 @@ void Server::response(const std::string &input, std::string *outstr1, std::strin
 
     //out
     for(auto it=values.begin(); it!=values.end(); ++it){
-        outstr1->append(std::to_string(*it));
+        outstr1.append(std::to_string(*it));
         if(it+1 != values.end())
-            *outstr1 += " ";
+            outstr1 += " ";
     }
-    outstr2->append(std::to_string(sum));
+    outstr2.append(std::to_string(sum));
 }
 
 int Server::send_tcp(int fd, const uint8_t *data, uint32_t size)

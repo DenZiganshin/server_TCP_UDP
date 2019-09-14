@@ -77,7 +77,7 @@ private:
      * @param fds - вектор с дескрипторами для poll
      * @return
      */
-    bool process_new_tcp_connection(std::vector <struct pollfd> *fds);
+    bool process_new_tcp_connection(std::vector <struct pollfd> &fds);
 
     /**
      * @brief обработка сообщения от клиетна по tcp
@@ -85,15 +85,15 @@ private:
      * @param num - номер клиетна в fds
      * @return
      */
-    bool process_tcp_client(std::vector <struct pollfd> *fds, int num);
+    bool process_tcp_client(std::vector <struct pollfd> &fds, int num);
 
     /**
      * @brief подготовка ответа на основе запроса
      * @param input - входная строка
-     * @param outstr1 - ответ1
-     * @param outstr2 - ответ2
+     * @param[in,out] outstr1 - ответ1
+     * @param[in,out] outstr2 - ответ2
      */
-    void response(const std::string &input, std::string *outstr1, std::string *outstr2);
+    void response(const std::string &input, std::string &outstr1, std::string &outstr2);
 
     int send_tcp(int fd, const uint8_t *data, uint32_t size);
     int send_udp(struct sockaddr_in* dst, const uint8_t *data, uint32_t size);
