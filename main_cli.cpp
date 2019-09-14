@@ -13,7 +13,8 @@ using namespace std;
 
 void usage(){
     cout << "usage:" << endl;
-    cout << "i - ip" << endl << "p - port" << endl << "r - protocol" << endl << "f - file" << endl << "h - this help" << endl;
+    cout << "client -i 127.0.0.1 -p 5555 -r udp [messgage]"<<endl;
+    cout << "i - ip" << endl << "p - port" << endl << "r - protocol" << endl << "h - this help" << endl;
 }
 
 int main(int argc, char **argv)
@@ -21,7 +22,7 @@ int main(int argc, char **argv)
     const int max_msg_size = 1024;
 
     int opt = -1;
-    string ip = "127.0.0.1", message = "default msg: 1a 2 b 3 c 34 efg 19 hij 435klmn ";
+    string ip = "127.0.0.1", message;
     int port = 0;
     bool is_tcp = false;
     std::shared_ptr<Client>client(new Client());
@@ -30,7 +31,7 @@ int main(int argc, char **argv)
         usage();
         exit(EXIT_SUCCESS);
     }
-    while ((opt = getopt(argc, argv, "i:p:r:f:hs")) != -1) {
+    while ((opt = getopt(argc, argv, "i:p:r:hs")) != -1) {
         switch (opt) {
         //ip
         case 'i':
@@ -61,26 +62,6 @@ int main(int argc, char **argv)
             }
             cout << "protocol:" << (is_tcp?"tcp":"udp") << endl;
             break;
-        //file
-        case 'f':
-            {
-                std::ifstream inFile;
-                inFile.open(optarg, std::ifstream::binary); //open the input file
-                if(!inFile.is_open()){
-                    cout << "open file "<< optarg<< " error"<<endl;
-                    exit(EXIT_FAILURE);
-                }
-                char data[max_msg_size] = {0};
-                inFile.read(data, max_msg_size);
-                if( !inFile.eof() && inFile.fail() )
-                {
-                    cout << "read file error"<<endl;
-                    exit(EXIT_FAILURE);
-                }
-                message = data;
-            }
-            cout << "message:" <<message.length()<<": "<<message << endl;
-            break;
         //help
         case 'h':
         default:
@@ -88,6 +69,13 @@ int main(int argc, char **argv)
             exit(EXIT_SUCCESS);
         }
     }
+
+    for (int i = optind; i < argc; i++){
+        message += argv[i];
+        if(i+1 < argc)
+            message += " ";
+    }
+    cout << "{" << message << "}" << endl;
 
     client->init(ip, port, is_tcp);
     client->send_data(message.c_str(), message.length());
